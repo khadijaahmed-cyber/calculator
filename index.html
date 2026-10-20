@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pastel Calculator</title>
+<style>
+:root{--bg:#fbe3ec;--card:#fff;--panel:#f6d3e0;--text:#5a4150;--sub:#86667a;--action:#f5bdd3;--op:#ff9ebb;--eq:#c9b6ff;--shadow:0 8px 24px #6b3d5512}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;display:flex;justify-content:center;align-items:flex-start;padding:24px 12px;transition:.2s}
+.app{width:min(100%,390px)}header,.toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}header{padding:0 4px}h1{font-size:18px;margin:0}.toolbar{justify-content:flex-start;flex-wrap:wrap}
+button{border:0;cursor:pointer;color:var(--text);font-weight:700;transition:filter .12s,transform .08s;touch-action:manipulation}button:hover{filter:brightness(.97)}button:active{transform:scale(.97)}
+.chip{border-radius:999px;padding:9px 13px;background:var(--card);box-shadow:var(--shadow);font-size:12px}.display{background:var(--card);border-radius:20px;padding:18px 16px;box-shadow:var(--shadow);min-height:100px;display:flex;flex-direction:column;justify-content:flex-end;text-align:right;overflow:hidden;margin-bottom:12px}.previous{font-size:13px;color:var(--sub);min-height:18px;overflow-wrap:anywhere}.screen{font-size:clamp(27px,8vw,38px);font-weight:600;min-height:44px;overflow-wrap:anywhere}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.key{height:58px;border-radius:18px;background:var(--card);box-shadow:var(--shadow);font-size:20px;color:var(--text)}.action{background:var(--action);color:var(--text)}.operator{background:var(--op);color:var(--text)}.equals{background:var(--eq);color:#3b2a6b}.sci{display:none;margin-bottom:8px}.sci.show{display:grid}.sci .key{height:40px;font-size:15px;border-radius:13px}.history{display:none;margin-top:12px;padding:14px;background:var(--panel);border-radius:16px}.history.show{display:block}.history-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.history-list{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:5px}.history-item{background:var(--card);border-radius:9px;padding:9px;text-align:right;font-weight:500}.hint{font-size:12px;color:var(--sub);text-align:center;margin-top:12px}
+@media(min-width:620px){body{align-items:center}.app{width:390px}}
+</style></head>
+<body><main class="app">
+<header><h1>Pastel Calculator</h1><button class="chip" id="theme">◐ Blush</button></header>
+<div class="toolbar"><button class="chip" id="sciToggle">ƒ Sci</button><button class="chip" id="historyToggle">☰ History</button><button class="chip" id="voice">● Voice</button></div>
+<section class="display" aria-live="polite"><div class="previous" id="previous"></div><div class="screen" id="screen">0</div></section>
+<section class="grid sci" id="sci">
+<button class="key" data-key="(">(</button><button class="key" data-key=")">)</button><button class="key" data-key="²">x²</button><button class="key" data-key="^">x^y</button>
+<button class="key" data-key="√">√</button><button class="key" data-key="π">π</button><button class="key" data-key="e">e</button><button class="key" data-key="!">n!</button>
+<button class="key" data-key="sin">sin</button><button class="key" data-key="cos">cos</button><button class="key" data-key="tan">tan</button><button class="key" data-key="abs">|x|</button>
+<button class="key" data-key="log">log</button><button class="key" data-key="ln">ln</button><button class="key" data-key="inv">1/x</button><button class="key action" id="angle">DEG</button>
+</section>
+<section class="grid" id="keys">
+<button class="key action" data-key="C">C</button><button class="key action" data-key="⌫">⌫</button><button class="key action" data-key="%">%</button><button class="key operator" data-key="÷">÷</button>
+<button class="key" data-key="7">7</button><button class="key" data-key="8">8</button><button class="key" data-key="9">9</button><button class="key operator" data-key="×">×</button>
+<button class="key" data-key="4">4</button><button class="key" data-key="5">5</button><button class="key" data-key="6">6</button><button class="key operator" data-key="−">−</button>
+<button class="key" data-key="1">1</button><button class="key" data-key="2">2</button><button class="key" data-key="3">3</button><button class="key operator" data-key="+">+</button>
+<button class="key action" data-key="±">±</button><button class="key" data-key="0">0</button><button class="key" data-key=".">.</button><button class="key equals" data-key="=">=</button>
+</section>
+<section class="history" id="history"><div class="history-top"><strong>History</strong><button class="chip" id="clearHistory">Clear</button></div><div class="history-list" id="historyList"></div></section>
+<div class="hint">Keyboard supported · Scientific mode · Results stay on this device</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let expr="",previous="",justEvaluated=false,angle="deg",sciVisible=false,historyVisible=false,entries=[],themeIndex=0;
+const themes=[
+{name:"Blush",bg:"#fbe3ec",card:"#ffffff",panel:"#f6d3e0",text:"#5a4150",sub:"#86667a",action:"#f5bdd3",op:"#ff9ebb",eq:"#c9b6ff"},
+{name:"Mint",bg:"#dff3e8",card:"#ffffff",panel:"#cfeadb",text:"#3f5a4e",sub:"#5a8070",action:"#bfe8d3",op:"#8fdcbd",eq:"#ffd3a5"},
+{name:"Lavender",bg:"#e8e2fa",card:"#ffffff",panel:"#dbd3f5",text:"#4b4468",sub:"#756d9c",action:"#d0c6f3",op:"#b4a5f0",eq:"#ffc1d9"},
+{name:"Peach",bg:"#ffe6d3",card:"#ffffff",panel:"#fcd8bf",text:"#614a3c",sub:"#8c6c59",action:"#ffcfae",op:"#ffab82",eq:"#b5e2fa"},
+{name:"Sky",bg:"#dcedfb",card:"#ffffff",panel:"#cbe3f7",text:"#3d5468",sub:"#58788f",action:"#bcdaf5",op:"#8ec6f3",eq:"#fdf0a6"}];
+function applyTheme(){let t=themes[themeIndex],r=document.documentElement.style;r.setProperty("--bg",t.bg);r.setProperty("--card",t.card);r.setProperty("--panel",t.panel);r.setProperty("--text",t.text);r.setProperty("--sub",t.sub);r.setProperty("--action",t.action);r.setProperty("--op",t.op);r.setProperty("--eq",t.eq);$("theme").textContent="◐ "+t.name}
+$("theme").onclick=()=>{themeIndex=(themeIndex+1)%themes.length;applyTheme()};
+$("sciToggle").onclick=()=>{$("sci").classList.toggle("show");sciVisible=!sciVisible;$("sciToggle").style.background=sciVisible?"var(--op)":"var(--card)"};
+$("historyToggle").onclick=()=>{$("history").classList.toggle("show");historyVisible=!historyVisible;renderHistory()};
+$("clearHistory").onclick=()=>{entries=[];renderHistory()};
+$("angle").onclick=()=>{angle=angle==="deg"?"rad":"deg";$("angle").textContent=angle.toUpperCase()};
+function render(){ $("screen").textContent=expr||"0";let hint=previous;if(!justEvaluated&&expr&&!/^−?\d*\.?\d*$/.test(expr)){try{hint="= "+format(evaluate(expr.replace(/[+−×÷^]+$/,"")))}catch(e){}}$("previous").textContent=hint; }
+function renderHistory(){const el=$("historyList");el.innerHTML="";entries.forEach((e,i)=>{let b=document.createElement("button");b.className="history-item";b.textContent=e.expr+" = "+e.result;b.onclick=()=>{expr=e.result;previous=e.expr+" =";justEvaluated=true;render()};el.appendChild(b)})}
+function fresh(){if(justEvaluated){expr="";previous="";justEvaluated=false}}
+function lastNumber(){return (expr.match(/[0-9.]*$/)||[""])[0]}
+function press(k){
+ if(k==="C"){expr="";previous="";justEvaluated=false;render();return}
+ if(k==="⌫"){if(justEvaluated){expr="";previous="";justEvaluated=false}else expr=expr.replace(/(?:sin\(|cos\(|tan\(|log\(|ln\(|abs\(|√\(|.)$/,"");render();return}
+ if(k==="="){calculate();return}
+ if(k==="mode"){angle=angle==="deg"?"rad":"deg";$("angle").textContent=angle.toUpperCase();return}
+ if("0123456789.".includes(k)&&k.length===1){fresh();let cur=lastNumber();if(k==="."&&cur.includes("."))return;if(k==="."&&cur==="")k="0.";else if(k!=="."&&cur==="0")expr=expr.slice(0,-1);expr+=k;render();return}
+ if(["+","−","×","÷","^"].includes(k)){if(k==="^"&&justEvaluated)expr="("+expr+")";justEvaluated=false;if(!expr||expr.endsWith("(")){if(k==="−")expr+=k;render();return}if(["+","−","×","÷","^"].includes(expr.slice(-1))){let base=expr.replace(/[+−×÷^]+$/,"");if(k==="−"&&["×","÷","^"].includes(expr.slice(-1)))expr+=k;else if(base&&!base.endsWith("("))expr=base+k}else expr+=k;render();return}
+ if(["%","!","²"].includes(k)){if(expr&&!/[+−×÷^(]$/.test(expr)){if(justEvaluated)expr="("+expr+")";expr+=k;justEvaluated=false}render();return}
+ if(k==="inv"){if(expr){expr="1÷("+expr+")";}else expr="1÷(";justEvaluated=false;render();return}
+ if(k==="±"){let m=expr.match(/[0-9.]+$/);if(m){let s=m.index,before=expr[s-1]||"";if(before==="−"&&(s===1||/[+−×÷^(]/.test(expr[s-2]||"")))expr=expr.slice(0,s-1)+expr.slice(s+m[0].length);else if(before==="−")expr=expr.slice(0,s-1)+"+"+expr.slice(s+m[0].length);else if(before==="+")expr=expr.slice(0,s-1)+"−"+expr.slice(s+m[0].length);else expr=expr.slice(0,s)+"−"+expr.slice(s)}render();return}
+ if(["sin","cos","tan","log","ln","abs","√"].includes(k)){if(justEvaluated){expr=k+"("+expr+")";previous="";justEvaluated=false}else expr+=k+"(";render();return}
+ if(["π","e","(",")"].includes(k)){fresh();expr+=k;render()}
+}
+function tokenize(s){let re=/\s*(?:(\d+\.?\d*|\.\d+)|(sin|cos|tan|log|ln|abs|√)|(π|e)|(\S))/gy,t=[],m;while(re.lastIndex<s.length){m=re.exec(s);if(!m)throw Error("Invalid input");if(m[1])t.push(["num",m[1]]);else if(m[2])t.push(["func",m[2]]);else if(m[3])t.push(["const",m[3]]);else t.push(["op",m[4]])}return t}
+function evaluate(s){
+ let t=tokenize(s),opens=t.filter(x=>x[0]==="op"&&x[1]==="(").length,closes=t.filter(x=>x[0]==="op"&&x[1]===")").length;while(opens-->closes)t.push(["op",")"]);
+ let p=0;const peek=()=>t[p]||[null,null],take=()=>t[p++],accept=(...ss)=>{let x=peek();if(x[0]==="op"&&ss.includes(x[1])){p++;return x[1]}return null},expect=x=>{if(!accept(x))throw Error("Invalid input")},starts=()=>["num","func","const"].includes(peek()[0])||(peek()[0]==="op"&&peek()[1]==="(");
+ const expr=()=>{let v=term();while(true){let o=accept("+","−");if(!o)return v;let r=term();v=o==="+"?v+r:v-r}};
+ const term=()=>{let v=unary();while(true){let o=accept("×","÷");if(o==="×")v*=unary();else if(o==="÷")v/=unary();else if(starts())v*=unary();else return v}};
+ const unary=()=>{if(accept("−"))return -unary();if(accept("+"))return unary();return power()};
+ const power=()=>{let b=postfix();if(accept("^"))return Math.pow(b,unary());return b};
+ const postfix=()=>{let v=atom();while(true){let o=accept("%","!","²");if(o==="%")v/=100;else if(o==="!") {if(!Number.isInteger(v)||v<0||v>170)throw Error("Factorial needs a whole number from 0 to 170");let n=1;for(let i=2;i<=v;i++)n*=i;v=n}else if(o==="²")v=Math.pow(v,2);else return v}};
+ const fn=(name,x)=>{if(name==="abs")return Math.abs(x);if(name==="√")return Math.sqrt(x);if(name==="log")return Math.log10(x);if(name==="ln")return Math.log(x);let a=angle==="deg"?x*Math.PI/180:x;if(name==="sin")return Math.sin(a);if(name==="cos")return Math.cos(a);if(Math.abs(Math.cos(a))<1e-12)throw Error("Tangent is undefined here");return Math.tan(a)};
+ const atom=()=>{let [kind,x]=take();if(kind==="num")return Number(x);if(kind==="const")return x==="π"?Math.PI:Math.E;if(kind==="func"){expect("(");let v=expr();expect(")");return fn(x,v)}if(kind==="op"&&x==="("){let v=expr();expect(")");return v}throw Error("Invalid input")};
+ let v=expr();if(p!==t.length)throw Error("Invalid input");if(!Number.isFinite(v))throw Error("Result is not finite");return v;
+}
+function format(n){if(Number.isInteger(n)&&Math.abs(n)<1e15)return String(n).replace("-","−");let s=Number(n.toPrecision(12)).toString();return s.replace(/e([+-]?\d+)/,"×10^$1").replace("-","−")}
+function calculate(){if(justEvaluated||!expr.trim())return;let e=expr.replace(/[+−×÷^]+$/,"");if(!e)return;try{let n=evaluate(e),res=format(n);previous=e+" =";expr=res;justEvaluated=true;entries.unshift({expr:e,result:res});entries=entries.slice(0,50);renderHistory()}catch(err){previous=err.message==="Invalid input"?"Invalid input":err.message;expr="";justEvaluated=false}render()}
+document.querySelectorAll("[data-key]").forEach(b=>b.addEventListener("click",()=>press(b.dataset.key)));
+document.addEventListener("keydown",e=>{let map={"Enter":"=","Backspace":"⌫","Escape":"C","*":"×","/":"÷","-":"−","x":"×","X":"×"};let k=map[e.key]||e.key;if("0123456789.+".includes(k)||["=","⌫","C","+","−","×","÷","%","(",")"].includes(k)){e.preventDefault();press(k)}});
+function spokenNumberWords(text){
+ const small={zero:0,oh:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19};
+ const tens={twenty:20,thirty:30,forty:40,fourty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+ text=text.replace(/\b(twenty|thirty|forty|fourty|fifty|sixty|seventy|eighty|ninety)[ -](one|two|three|four|five|six|seven|eight|nine)\b/gi,(_,a,b)=>String(tens[a.toLowerCase()]+small[b.toLowerCase()]));
+ text=text.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|zero|oh)\b/gi,w=>String(small[w.toLowerCase()]));
+ text=text.replace(/\b(twenty|thirty|forty|fourty|fifty|sixty|seventy|eighty|ninety)\b/gi,w=>String(tens[w.toLowerCase()]));
+ return text;
+}
+function voiceExpression(spoken){
+ let s=spoken.toLowerCase().replace(/[?,=]/g," ").replace(/\bwhat(?:'s| is)?\b|\bcalculate\b|\bcompute\b|\bplease\b|\bequals?\b|\bthe answer\b/g," ");
+ s=spokenNumberWords(s);
+ s=s.replace(/\b(square root(?: of)?|sqrt(?: of)?)\b/g," ROOT ")
+  .replace(/\b(multiplied by|multiply by|times)\b/g," * ")
+  .replace(/\b(divided by|divide by|over)\b/g," / ")
+  .replace(/\b(plus|add)\b/g," + ").replace(/\b(minus|subtract)\b/g," - ")
+  .replace(/\b(to the power of|raised to(?: the power of)?|power of)\b/g," ^ ")
+  .replace(/\bsquared\b/g," ² ").replace(/\bcubed\b/g," ^ 3 ")
+  .replace(/\b(sine|sin)\b/g," sin ").replace(/\b(cosine|cos)\b/g," cos ").replace(/\b(tangent|tan)\b/g," tan ")
+  .replace(/\bnatural log(?:arithm)?(?: of)?\b/g," ln ").replace(/\blogarithm(?: of)?\b|\blog(?: of)?\b/g," log ")
+  .replace(/\babsolute value(?: of)?\b/g," abs ").replace(/\bpi\b/g," π ").replace(/\bpercent(?: of)?\b/g," % ")
+  .replace(/\bROOT\s*(\d+(?:\.\d+)?)/g," √($1) ")
+  .replace(/\b(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/g,"$1 * $2")
+  .replace(/\bpoint\s+(zero|one|two|three|four|five|six|seven|eight|nine)\b/g,(_,n)=>"."+({zero:"0",one:"1",two:"2",three:"3",four:"4",five:"5",six:"6",seven:"7",eight:"8",nine:"9"}[n]));
+ s=s.replace(/\*/g," × ").replace(/\//g," ÷ ").replace(/-/g," − ").replace(/\^/g," ^ ");
+ s=s.replace(/[^0-9a-zπe.+−×÷^()%!²√\s]/g," ").replace(/\s+/g," ").trim();
+ // Functions take the next spoken number in parentheses.
+ s=s.replace(/\b(sin|cos|tan|log|ln|abs)\s+(\d+(?:\.\d+)?|π|e)\b/g,"$1($2)");
+ // If the browser transcribes a bare root as a symbol followed by a number.
+ s=s.replace(/√\s*(\d+(?:\.\d+)?)/g,"√($1)");
+ return s || null;
+}
+$("voice").onclick=()=>{
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!window.isSecureContext){$("previous").textContent="Voice needs a secure HTTPS link. Open the published GitHub Pages link.";return}
+ if(!SR){$("previous").textContent="Voice recognition isn't supported by this browser. Try an updated Chrome or Safari.";return}
+ const r=new SR();r.lang="en-US";r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
+ const oldText=$("voice").textContent;$("voice").textContent="◌ Starting…";$("voice").disabled=true;
+ r.onstart=()=>{$("voice").textContent="◉ Listening…";$ ("previous").textContent="Speak in English, e.g. five plus three".replace(/^\s+/,"")};
+ r.onerror=e=>{let msg="Voice input failed. Check microphone permission and internet connection.";if(e.error==="not-allowed"||e.error==="service-not-allowed")msg="Microphone permission was denied. Allow microphone access in your browser settings.";else if(e.error==="no-speech")msg="No speech detected. Press Voice and speak right away.";else if(e.error==="network")msg="The browser's speech service has a network problem.";$("previous").textContent=msg};
+ r.onend=()=>{$("voice").textContent=oldText||"● Voice";$("voice").disabled=false};
+ r.onresult=e=>{const heard=e.results[0][0].transcript;const converted=voiceExpression(heard);if(!converted){$("previous").textContent='Heard: "'+heard+'" — try saying an expression like “five plus three”.';return}expr=converted;previous="Heard: "+heard;justEvaluated=false;render();calculate()};
+ try{r.start()}catch(err){$("voice").disabled=false;$("voice").textContent="● Voice";$("previous").textContent="Could not start voice input. Try again."}
+};
+render();applyTheme();
+</script></body></html>
